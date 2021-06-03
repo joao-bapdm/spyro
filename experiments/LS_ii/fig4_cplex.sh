@@ -24,6 +24,6 @@ for case; do
     mpiexec -np $N python fwd.py -i vp_ls_complex_exact.hdf5 -c $case
 
     # run inversion
-    mpiexec -np $N python fwi_cplex.py -O cplex -c $case > $log
+    mpiexec -np $N python fwi_cplex.py -O cplex -e vp_ls_complex_exact.hdf5 -c $case > $log
 
 done
