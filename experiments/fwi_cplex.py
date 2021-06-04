@@ -90,6 +90,8 @@ def shots(xi, stops):
     indices = np.insert(np.cumsum(N), 0, 0)
     # vp_guess.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
     normalized_vp.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
+    vp_guess.assign(spyro.utils.control_to_vp(model, normalized_vp))
+
 
     # Check if the program has converged (and exit if so).
     stops[0] = COMM_WORLD.bcast(stop[0], root=0)
@@ -270,11 +272,12 @@ normalized_vp.dat.data[:] = xi[:]
 vp_guess = spyro.utils.control_to_vp(model, normalized_vp)
 
 # Specify output
+resultpic = model["data"]["pic"]
 outdir, resultfile = model["output"]["outdir"], model["data"]["resultfile"]
 # Save hdf5 and png of final result
 spyro.utils.save_velocity_model(comm, vp_guess, os.path.join(outdir, resultfile))
-spyro.io.save_image(vp_guess, fname=os.path.join(outdir, resultfile.split(".")[0]))
+spyro.io.save_image(vp_guess, fname=os.path.join(outdir, resultpic))
 # Register objective function history
 if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-    np.save(os.path.join(outdir, "fobj"), np.array(fobj))
+    np.save(os.path.join(outdir, model["data"]["fobj"]), np.array(fobj))
 
