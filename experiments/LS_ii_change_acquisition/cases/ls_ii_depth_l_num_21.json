@@ -85,13 +85,13 @@
         "optimizer": "cplex"
     },
     "output": {
-        "outdir": "results/ls_ii_depth_l_and_r_num_31"
+        "outdir": "results/ls_ii_depth_l_num_21"
     },
     "data": {
-        "shots": "shots/ls_ii_depth_l_and_r_num_31",
+        "shots": "shots/ls_ii_depth_l_num_21",
         "initfile": null,
-        "pic": "pv_ls_ii_depth_l_and_r_num_31.png",
-        "resultfile": "vp_ls_ii_depth_l_and_r_num_31.hdf5",
-        "fobj": "fobj_depth_l_and_r_num_31.npy"
+        "pic": "pv_ls_ii_depth_l_num_21.png",
+        "resultfile": "vp_ls_ii_depth_l_num_21.hdf5",
+        "fobj": "fobj_depth_l_num_21.npy"
     }
 }

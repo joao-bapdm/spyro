@@ -85,11 +85,12 @@
         "optimizer": "cplex"
     },
     "output": {
-        "outdir": "results/depth_r_num_101"
+        "outdir": "results/ls_ii_depth_r_num_101"
     },
     "data": {
         "shots": "shots/ls_ii_depth_r_num_101",
         "initfile": null,
+        "pic": "pv_ls_ii_depth_r_num_101.png",
         "resultfile": "vp_ls_ii_depth_r_num_101.hdf5",
         "fobj": "fobj_depth_r_num_101.npy"
     }

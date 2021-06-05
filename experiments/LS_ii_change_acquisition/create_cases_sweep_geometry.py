@@ -13,7 +13,7 @@ with open(basefile, "r") as f:
 
 # receiver configurations
 rec_depths = [[0.05], [1.95], [0.05, 1.95]]
-num_receivers = [11, 31, 51, 76, 101]
+num_receivers = [11, 21, 31, 51, 76, 101]
 
 # set parameters
 for depth in rec_depths:
@@ -31,10 +31,11 @@ for depth in rec_depths:
         # basename
         name = "depth_" + depths + "_num_" + str(num)
         # define output directory
-        basemodel["output"] = {"outdir": "results/" + name}
+        basemodel["output"] = {"outdir": "results/ls_ii_" + name}
         # set output files
         basemodel["data"] = {"shots": "shots/ls_ii_" + name,
                              "initfile": None,
+                             "pic": "pv_ls_ii_" + name + ".png",
                              "resultfile": "vp_ls_ii_" + name + ".hdf5",
                              "fobj": "fobj_" + name + ".npy"}
 
