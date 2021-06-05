@@ -43,9 +43,12 @@
         ],
         "frequency": 2,
         "delay": 1.0,
-        "num_receivers": 21,
+        "num_receivers": 76,
         "rec_depth": [
             0.05,
+            1.95
+        ],
+        "rec_depths": [
             1.95
         ]
     },

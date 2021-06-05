@@ -28,6 +28,10 @@ for depth in rec_depths:
         elif depth == [0.05, 1.95]:
             depths = "l_and_r"
 
+        # set number of receivers and depth
+        basemodel["acquisition"]["num_receivers"] = num
+        basemodel["acquisition"]["rec_depths"] = depth
+
         # basename
         name = "depth_" + depths + "_num_" + str(num)
         # define output directory
