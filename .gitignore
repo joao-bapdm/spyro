@@ -6,3 +6,6 @@
 *.dat
 *.hdf5
 *.msh
+/fwd.py
+/fwi_cplex.py
+
