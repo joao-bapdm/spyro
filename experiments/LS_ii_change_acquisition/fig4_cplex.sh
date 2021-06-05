@@ -17,13 +17,17 @@ for case; do
     echo "hdf5 result is $resultfile, and the output directory is $outdir/"
 
     # name log file
-    log=$(echo "$case" | sed "s/json/log/g")
-    echo "log file is $log"
+    log=$(echo "$case" | sed "s/json/log/g" | rev | cut -d/ -f1 | rev)
+    flog=$(echo $outdir/$log)
+    echo "log file is $flog"
+    
+    # create output directory
+    mkdir -p $outdir
 
     # run forward
     mpiexec -np $N python fwd.py -i vp_ls_complex_exact.hdf5 -c $case
 
     # run inversion
-    mpiexec -np $N python fwi_cplex.py -O cplex -e vp_ls_complex_exact.hdf5 -c $case > $log
+    mpiexec -np $N python fwi_cplex.py -O cplex -e vp_ls_complex_exact.hdf5 -c $case > $flog
 
 done
