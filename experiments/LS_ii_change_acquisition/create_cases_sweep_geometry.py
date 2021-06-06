@@ -30,7 +30,7 @@ for depth in rec_depths:
 
         # set number of receivers and depth
         basemodel["acquisition"]["num_receivers"] = num
-        basemodel["acquisition"]["rec_depths"] = depth
+        basemodel["acquisition"]["rec_depth"] = depth
 
         # basename
         name = "depth_" + depths + "_num_" + str(num)

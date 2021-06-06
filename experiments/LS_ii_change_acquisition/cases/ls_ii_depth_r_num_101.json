@@ -45,10 +45,6 @@
         "delay": 1.0,
         "num_receivers": 101,
         "rec_depth": [
-            0.05,
-            1.95
-        ],
-        "rec_depths": [
             1.95
         ]
     },
