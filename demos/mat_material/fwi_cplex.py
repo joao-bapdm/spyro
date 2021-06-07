@@ -167,6 +167,11 @@ def shots(xi, stops):
     # write paraview output
     cb.write_file(m=normalized_vp, dm=vp_gradient, vp=vp_guess)
     if vp_exact: M.append(errornorm(vp_exact, vp_guess))
+    spyro.io.save_image(
+        vp_guess, fname=os.path.join(
+            model["output"]["outdir"], "intermediate_" + model["data"]["pic"]
+        )
+    )
 
     return J_total[0], dJ_total
 
@@ -197,6 +202,7 @@ fobj = []
 stop = [0]
 change = 100
 counter = 0
+max_iter = model["inversion"]["max_iter"]
 beta = model["cplex"]["beta"]
 mul_beta = model["cplex"]["mul_beta"]
 mul_rmin = model["cplex"]["mul_rmin"]
@@ -212,7 +218,7 @@ m, v = 0, 0
 # Call the optimization routine from the master rank.
 if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
    
-    while counter < 200:
+    while counter < max_iter:
 
         # evaluate functional, gradient
         model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'], root=0)
