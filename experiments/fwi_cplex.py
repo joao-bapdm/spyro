@@ -32,6 +32,14 @@ else:
 File("vp_init.pvd").write(vp_guess)
 vp_gradient = Function(V)
 
+# load exact reference model
+if model["data"].get("exactfile"):
+    vp_exact = spyro.utils.load_velocity_model(
+        model, V, source_file=model["data"]["exactfile"]
+    )
+else:
+    vp_exact = None
+
 # get control from vp
 normalized_vp = spyro.utils.normalize_vp(model, vp_guess)
 discrete_data = normalized_vp.dat.data.round()
@@ -88,10 +96,8 @@ def shots(xi, stops):
     n = len(normalized_vp.dat.data[:])
     N = [comm.comm.bcast(n, r) for r in range(size)]
     indices = np.insert(np.cumsum(N), 0, 0)
-    # vp_guess.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
     normalized_vp.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
     vp_guess.assign(spyro.utils.control_to_vp(model, normalized_vp))
-
 
     # Check if the program has converged (and exit if so).
     stops[0] = COMM_WORLD.bcast(stop[0], root=0)
@@ -160,6 +166,7 @@ def shots(xi, stops):
 
     # write paraview output
     cb.write_file(m=normalized_vp, dm=vp_gradient, vp=vp_guess)
+    if vp_exact: M.append(errornorm(vp_exact, vp_guess))
 
     return J_total[0], dJ_total
 
@@ -185,6 +192,7 @@ elif model["material"]["type"] == None:
     lb = model["opts"]["cmin"]
     ub = model["opts"]["cmax"]
 
+M = []
 fobj = []
 stop = [0]
 change = 100
@@ -280,4 +288,6 @@ spyro.io.save_image(vp_guess, fname=os.path.join(outdir, resultpic))
 # Register objective function history
 if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
     np.save(os.path.join(outdir, model["data"]["fobj"]), np.array(fobj))
+    if vp_exact:
+        np.save(os.path.join(outdir, "quality_measure"), np.array(M))
 
