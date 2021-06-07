@@ -353,9 +353,7 @@ def load_model(jsonfile=None):
     for key, ext in zip(["shots", "pic", "resultfile", "fobj"], ["", ".png", ".hdf5", ".npy"]):
         if key not in model["data"]:
             model["data"][key] = file.replace(".json", ext)
-        
 
-    import IPython; IPython.embed(); exit()
     return model
 
 def save_model(model, jsonfile=None):
