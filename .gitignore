@@ -14,3 +14,5 @@
 *.h5
 *.tar.xz
 *.log
+/fwd.py
+/fwi_cplex.py
