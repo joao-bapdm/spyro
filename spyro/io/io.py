@@ -340,6 +340,23 @@ def load_model(jsonfile=None):
             model["inversion"]["optimizer"] = optimizer
         else:
             model["inversion"] = {"optimizer": optimizer}
+    
+    # set output naming
+    if "output" not in model:
+        dest = os.path.join("results", file)
+        model["output"] = {}
+    if "outdir" not in model["output"]:
+        model["output"]["outdir"] = dest.rstrip(".json")
+
+    if "data" not in model:
+        model["data"] = {}
+
+    for key, ext in zip(["pic", "resultfile", "fobj"], [".png", ".hdf5", ".npy"]):
+        if key not in model["data"]:
+            model["data"][key] = file.replace(".json", ext)
+
+    if "shots" not in model["data"]:
+        model["data"]["shots"] = os.path.join("shots", file)
 
     return model
 
