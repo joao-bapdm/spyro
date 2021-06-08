@@ -58,7 +58,6 @@ class Geometry:
         "Create receivers transect"""
 
         # if not self.model["acquisition"]["receiver_locations"]: 
-        import IPython; IPython.embed()
         if "receiver_locations" not in self.model["acquisition"]: 
 
             self.model["acquisition"]["receiver_locations"] = []
