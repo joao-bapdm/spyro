@@ -70,12 +70,13 @@ class Callback:
             if vp:
                 self.vp_file.write(vp)
 
-def save_image(field, fname=None, cmap="seismic", format=None):
+def save_image(field, fname=None, cmap="seismic", format=None, subplots=None):
     """save firedrake.Function as imagefile"""
     fname = field.name() if not fname else fname
-    fig, axes = plt.subplots()
+    fig, axes = plt.subplots() if not subplots else subplots
     fire.tripcolor(field, axes=axes, cmap=cmap); axes.set_aspect("equal")
     fig.savefig(fname, format=format)
+    plt.close(plt.gcf())
 
 def save_shots(filename, array):
     """Save a `numpy.ndarray` to a `pickle`.
