@@ -39,12 +39,16 @@ class Geometry:
         #     (self.src_depth, self.src_XMIN), (self.src_depth, self.src_XMAX), self.num_sources
         # )
 
-        self.model["acquisition"]["source_pos"] = []
-        for depth in self.src_depth:
-            self.model["acquisition"]["source_pos"] += spyro.create_receiver_transect(
-                (depth, self.src_XMIN), (depth, self.src_XMAX), self.num_sources
-            ).tolist()
-        self.model["acquisition"]["source_pos"] = np.array(self.model["acquisition"]["source_pos"])
+        #if not self.model["acquisition"]["source_pos"]:
+        if "source_pos" not in self.model["acquisition"]:
+
+            self.model["acquisition"]["source_pos"] = []
+
+            for depth in self.src_depth:
+                self.model["acquisition"]["source_pos"] += spyro.create_receiver_transect(
+                    (depth, self.src_XMIN), (depth, self.src_XMAX), self.num_sources
+                ).tolist()
+            self.model["acquisition"]["source_pos"] = np.array(self.model["acquisition"]["source_pos"])
         
         sources = spyro.Sources(self.model, self.mesh, self.V, self.my_ensemble).create()
     
@@ -53,13 +57,17 @@ class Geometry:
     def create_receivers(self):
         "Create receivers transect"""
 
-        self.model["acquisition"]["receiver_locations"] = []
-        for depth in self.rec_depth:
-            self.model["acquisition"]["receiver_locations"] += spyro.create_receiver_transect(
-                (depth, self.rec_XMIN), (depth, self.rec_XMAX), self.num_receivers
-            ).tolist()
-        self.model["acquisition"]["receiver_locations"] = np.array(self.model["acquisition"]["receiver_locations"])
-        self.model["acquisition"]["num_receivers"] = len(self.model["acquisition"]["receiver_locations"])
+        # if not self.model["acquisition"]["receiver_locations"]: 
+        if "receiver_locations" not in self.model["acquisition"]: 
+
+            self.model["acquisition"]["receiver_locations"] = []
+
+            for depth in self.rec_depth:
+                self.model["acquisition"]["receiver_locations"] += spyro.create_receiver_transect(
+                    (depth, self.rec_XMIN), (depth, self.rec_XMAX), self.num_receivers
+                ).tolist()
+            self.model["acquisition"]["receiver_locations"] = np.array(self.model["acquisition"]["receiver_locations"])
+            self.model["acquisition"]["num_receivers"] = len(self.model["acquisition"]["receiver_locations"])
     
         receivers = spyro.Receivers(self.model, self.mesh, self.V, self.my_ensemble).create()
     
