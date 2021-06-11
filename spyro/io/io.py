@@ -19,7 +19,7 @@ __all__ = ["save_shots", "load_shots", "read_mesh", "interpolate"]
 
 class Callback:
 
-    def __init__(self, model, comm):
+    def __init__(self, model, comm, name=""):
         """Class for writing output.
 
         Parameters
@@ -32,15 +32,16 @@ class Callback:
 
         self.comm = comm
         self.model = model
+        self.name = name
 
     def create_file(self, m=None, dm=None, vp=None):
         """Create output file(s)"""
 
         outdir = self.model["output"]["outdir"]
         os.makedirs(outdir, exist_ok=True)
-        mfile = outdir+"/"+"m.pvd"
-        dmfile = outdir+"/"+"dm.pvd"
-        vpfile = outdir+"/"+"vp.pvd"
+        mfile = outdir+"/""m_"+self.name+".pvd"
+        dmfile = outdir+"/""dm_"+self.name+".pvd"
+        vpfile = outdir+"/""vp_"+self.name+".pvd"
 
         if self.comm.ensemble_comm.rank == 0:
             if m:
