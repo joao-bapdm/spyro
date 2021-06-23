@@ -50,6 +50,8 @@ File("before_vp_normalized.pvd").write(normalized_vp)
 # acquisition geometry
 sources, receivers = spyro.Geometry(model, mesh, V, comm).create()
 
+# import IPython; IPython.embed(); exit()
+
 # get water dofs
 water = spyro.utils.water_layer(
     mesh,
@@ -68,6 +70,10 @@ FREQ = model["acquisition"]["frequency"]
 # Specify output
 resultpic, fobjfile = model["data"]["pic"], model["data"]["fobj"]
 outdir, resultfile = model["output"]["outdir"], model["data"]["resultfile"]
+
+with open(os.path.join(model["output"]["outdir"], "output.log"), "w") as f: 
+    f.write("OPTIMIZATION HISTORY")
+    f.write("\n"+"===================="+"\n")
 
 # Define a callback function that returns the gradient and functional
 def shots(xi, stops):
@@ -196,6 +202,11 @@ def shots(xi, stops):
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     if not freq_band:
         freq_band = ""
+    with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+        if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+            f.write("\n"+"--------------------")
+            f.write(f"inverting for lowpassed {freq_band}Hz signal")
+            f.write("--------------------")
     # Callback object for output files
     name = str(freq_band)+"Hz" if freq_band else ""
     cb = spyro.io.Callback(model, comm, name=name)
@@ -282,6 +293,10 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             # printa diferença entre iterações
             print("\n"+iter_info.format( counter, J, change, beta,
                 model['opts']['rmin'])+"\n")
+            # print to file
+            with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+                f.write("\n"+iter_info.format( counter, J, change, beta,
+                        model['opts']['rmin'])+"\n")
 
             # save old functional
             J0, dJ0 = J, dJ
@@ -292,8 +307,13 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'],root=0)
         shots(xi, stop)
 
+        # print to stdout
         print("\n"+iter_info.format( counter, J, change, beta,
                 model['opts']['rmin'])+"\n")
+        # print to file
+        with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+            f.write("\n"+iter_info.format( counter, J, change, beta,
+                    model['opts']['rmin'])+"\n")
 
     else:
         while stop[0] == 0:
@@ -324,3 +344,14 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
             else:
                 quali = "quality_measure"
             np.save(os.path.join(outdir, quali), np.array(M))
+
+# config file used
+model["acquisition"]["source_pos"] = model["acquisition"]["source_pos"].tolist()
+model["acquisition"]["receiver_locations"] = model["acquisition"]["receiver_locations"].tolist()
+spyro.io.save_model(
+    model, 
+    jsonfile=os.path.join(
+        model["output"]["outdir"], 
+        model["data"]["configfile"]
+    )
+)
