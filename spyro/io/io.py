@@ -353,6 +353,9 @@ def load_model(jsonfile=None):
     if "data" not in model:
         model["data"] = {}
 
+    # for saving config file
+    model["data"]["configfile"] = file
+
     for key, ext in zip(["pic", "resultfile", "fobj"], [".png", ".hdf5", ".npy"]):
         if key not in model["data"]:
             model["data"][key] = file.replace(".json", ext)
