@@ -427,7 +427,7 @@
     },
     "cplex": {
         "beta": 0.005,
-        "mul_beta": 20,
+        "mul_beta": 10000,
         "use_rmin": true,
         "mul_rmin": 10000,
         "lim_rmin": 10000,
