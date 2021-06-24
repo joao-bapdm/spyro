@@ -71,6 +71,8 @@ FREQ = model["acquisition"]["frequency"]
 resultpic, fobjfile = model["data"]["pic"], model["data"]["fobj"]
 outdir, resultfile = model["output"]["outdir"], model["data"]["resultfile"]
 
+i# Initialize output log
+os.makedirs(model["output"]["outdir"], exist_ok=True)
 with open(os.path.join(model["output"]["outdir"], "output.log"), "w") as f: 
     f.write("OPTIMIZATION HISTORY")
     f.write("\n"+"===================="+"\n")
@@ -199,6 +201,26 @@ def shots(xi, stops):
 
     return J_total[0], dJ_total
 
+# Load cplex parameters
+max_iter = model["inversion"]["max_iter"]
+beta = model["cplex"]["beta"]
+mul_beta = model["cplex"]["mul_beta"]
+mul_rmin = model["cplex"]["mul_rmin"]
+lim_rmin = model["cplex"]["lim_rmin"]
+# gbar = model["cplex"]["gbar"]
+gbar = 1
+epsilons = model["cplex"]["epsilons"]
+iter_info = "it.: {:d} | obj.f.: {:e} | rel.var.: {:2.2f}% |"
+iter_info += " move: {:g} | rmin: {:g}"
+
+# ADAM parameters
+gamma_m = model["cplex"].get("gamma_m", 0.5)
+gamma_v = model["cplex"].get("gamma_v", 0.5)
+m, v = 0, 0
+
+# Initialize quality measure and objective function measures
+M, fobj = [], []
+
 for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
     if not freq_band:
         freq_band = ""
@@ -221,26 +243,10 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
         lb = model["opts"]["cmin"]
         ub = model["opts"]["cmax"]
 
-    M = []
-    fobj = []
     stop = [0]
     change = 100
     counter = 0
-    max_iter = model["inversion"]["max_iter"]
-    beta = model["cplex"]["beta"]
-    mul_beta = model["cplex"]["mul_beta"]
-    mul_rmin = model["cplex"]["mul_rmin"]
-    lim_rmin = model["cplex"]["lim_rmin"]
-    # gbar = model["cplex"]["gbar"]
-    gbar = 1
-    epsilons = model["cplex"]["epsilons"]
-    iter_info = "it.: {:d} | obj.f.: {:e} | rel.var.: {:2.2f}% |"
-    iter_info += " move: {:g} | rmin: {:g}"
 
-    # ADAM parameters
-    gamma_m = model["cplex"].get("gamma_m", 0.5)
-    gamma_v = model["cplex"].get("gamma_v", 0.5)
-    m, v = 0, 0
 
     # Call the optimization routine from the master rank.
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
@@ -272,7 +278,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
                 # calcula a variação na função objetivo
                 change = (J - J0) / J0
 
-                    # update beta
+            # update beta
             beta = spyro.optimizers.update_flip_limits( beta, counter, mul_beta,
                     change, xi, mode='counter')
             # update rmin
