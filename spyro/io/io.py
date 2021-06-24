@@ -19,7 +19,7 @@ __all__ = ["save_shots", "load_shots", "read_mesh", "interpolate"]
 
 class Callback:
 
-    def __init__(self, model, comm):
+    def __init__(self, model, comm, name=""):
         """Class for writing output.
 
         Parameters
@@ -32,15 +32,16 @@ class Callback:
 
         self.comm = comm
         self.model = model
+        self.name = name
 
     def create_file(self, m=None, dm=None, vp=None):
         """Create output file(s)"""
 
         outdir = self.model["output"]["outdir"]
         os.makedirs(outdir, exist_ok=True)
-        mfile = outdir+"/"+"m.pvd"
-        dmfile = outdir+"/"+"dm.pvd"
-        vpfile = outdir+"/"+"vp.pvd"
+        mfile = outdir+"/""m_"+self.name+".pvd"
+        dmfile = outdir+"/""dm_"+self.name+".pvd"
+        vpfile = outdir+"/""vp_"+self.name+".pvd"
 
         if self.comm.ensemble_comm.rank == 0:
             if m:
@@ -70,12 +71,13 @@ class Callback:
             if vp:
                 self.vp_file.write(vp)
 
-def save_image(field, fname=None, cmap="seismic", format=None):
+def save_image(field, fname=None, cmap="seismic", format=None, subplots=None):
     """save firedrake.Function as imagefile"""
     fname = field.name() if not fname else fname
-    fig, axes = plt.subplots()
+    fig, axes = plt.subplots() if not subplots else subplots
     fire.tripcolor(field, axes=axes, cmap=cmap); axes.set_aspect("equal")
     fig.savefig(fname, format=format)
+    plt.close(plt.gcf())
 
 def save_shots(filename, array):
     """Save a `numpy.ndarray` to a `pickle`.
@@ -350,6 +352,9 @@ def load_model(jsonfile=None):
 
     if "data" not in model:
         model["data"] = {}
+
+    # for saving config file
+    model["data"]["configfile"] = file
 
     for key, ext in zip(["pic", "resultfile", "fobj"], [".png", ".hdf5", ".npy"]):
         if key not in model["data"]:
