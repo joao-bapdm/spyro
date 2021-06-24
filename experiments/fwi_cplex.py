@@ -6,14 +6,15 @@ import json
 import argparse
 import spyro
 import spyro.optimizers.damp as adam
+from spyro.optimizers.tobs import TOBS
 
 from mpi4py import MPI
 import numpy.linalg as la
 import numpy as np
-import cplex
 
 # Load parameters
 model = spyro.io.load_model()
+# model["parallelism"]["type"] = "off"
 
 # Create the computational environment
 comm = spyro.utils.mpi_init(model)
@@ -44,24 +45,37 @@ else:
 normalized_vp = spyro.utils.normalize_vp(model, vp_guess)
 discrete_data = normalized_vp.dat.data.round()
 normalized_vp.dat.data[:] = discrete_data
-File("vp_normalized.pvd").write(normalized_vp)
+File("before_vp_normalized.pvd").write(normalized_vp)
 
 # acquisition geometry
 sources, receivers = spyro.Geometry(model, mesh, V, comm).create()
 
+# import IPython; IPython.embed(); exit()
+
 # get water dofs
 water = spyro.utils.water_layer(
-    mesh, 
-    V,  
+    mesh,
+    V,
     vp_guess,
     model
 )
 
 # Set water layer to zero
 normalized_vp.dat.data[water] = 0
+File("after_vp_normalized.pvd").write(normalized_vp)
 
 # excitation frequency
 FREQ = model["acquisition"]["frequency"]
+
+# Specify output
+resultpic, fobjfile = model["data"]["pic"], model["data"]["fobj"]
+outdir, resultfile = model["output"]["outdir"], model["data"]["resultfile"]
+
+i# Initialize output log
+os.makedirs(model["output"]["outdir"], exist_ok=True)
+with open(os.path.join(model["output"]["outdir"], "output.log"), "w") as f: 
+    f.write("OPTIMIZATION HISTORY")
+    f.write("\n"+"===================="+"\n")
 
 # Define a callback function that returns the gradient and functional
 def shots(xi, stops):
@@ -83,6 +97,14 @@ def shots(xi, stops):
         The gradient of the functional w.r.t. to the velocity model
 
     """
+    if freq_band:
+        print(
+            "INFO: Executing inversion for low-passed cut off of "
+            + str(freq_band)
+            + " Hz...",
+            flush=True,
+        )
+
     # Spatial communicator rank and size.
     rank = comm.comm.rank
     size = comm.comm.size
@@ -119,13 +141,17 @@ def shots(xi, stops):
                 # Load in "exact" or "observed" shot records from a pickle.
                 shotfile = model["data"]["shots"]+str(FREQ)+"Hz_sn_"+str(sn)+".dat"
                 p_exact_recv = spyro.io.load_shots(shotfile)
-
+                # low-pass filter the shot record for the current frequency band.
+                if freq_band:
+                    p_exact_recv = spyro.utils.butter_lowpass_filter(
+                        p_exact_recv, freq_band, 1.0 / model["timeaxis"]["dt"]
+                    )
                 # Compute the forward simulation for "guess".
                 p_guess, p_guess_recv = spyro.solvers.Leapfrog(
                     # model, mesh, comm, vp_guess, sources, receivers,
                     # source_num=sn
                     model, mesh, comm, spyro.utils.control_to_vp(model,
-                        normalized_vp), sources, receivers, source_num=sn)
+                        normalized_vp), sources, receivers, source_num=sn, lp_freq_index=index)
                 # Calculate the misfit.
                 misfit = spyro.utils.evaluate_misfit( model, comm,
                         p_guess_recv, p_exact_recv)
@@ -175,38 +201,15 @@ def shots(xi, stops):
 
     return J_total[0], dJ_total
 
-
-# if comm.ensemble_comm.rank == 0:
-#     # Initialize a file to visualize the control/vp each iteration
-#     viz_dm_file = File("gradient_cplex" + str(FREQ) + ".pvd", comm=comm.comm)
-#     viz_m_file = File("control_" + str(FREQ) + ".pvd", comm=comm.comm)
-#     viz_m_file.write(normalized_vp)
-#     viz_vp_file = File("vp_guess" + str(FREQ) + ".pvd", comm=comm.comm)
-#     viz_vp_file.write(vp_guess)
-
-# Callback object for output files
-cb = spyro.io.Callback(model, comm)
-cb.create_file(normalized_vp, vp_gradient, vp_guess)
-# Gather the full velocity data on the master rank
-xi = normalized_vp.vector().gather()
-# Bounds for control
-if model["material"]["type"] == "simp":
-    lb = 0
-    ub = 1
-elif model["material"]["type"] == None:
-    lb = model["opts"]["cmin"]
-    ub = model["opts"]["cmax"]
-
-M = []
-fobj = []
-stop = [0]
-change = 100
-counter = 0
+# Load cplex parameters
 max_iter = model["inversion"]["max_iter"]
 beta = model["cplex"]["beta"]
 mul_beta = model["cplex"]["mul_beta"]
 mul_rmin = model["cplex"]["mul_rmin"]
 lim_rmin = model["cplex"]["lim_rmin"]
+# gbar = model["cplex"]["gbar"]
+gbar = 1
+epsilons = model["cplex"]["epsilons"]
 iter_info = "it.: {:d} | obj.f.: {:e} | rel.var.: {:2.2f}% |"
 iter_info += " move: {:g} | rmin: {:g}"
 
@@ -215,85 +218,146 @@ gamma_m = model["cplex"].get("gamma_m", 0.5)
 gamma_v = model["cplex"].get("gamma_v", 0.5)
 m, v = 0, 0
 
-# Call the optimization routine from the master rank.
-if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-   
-    while counter < max_iter:
+# Initialize quality measure and objective function measures
+M, fobj = [], []
 
-        # evaluate functional, gradient
-        model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'], root=0)
-        J, dJ = shots(xi, stop)
-        fobj.append(J)
-        # dJ /= la.norm(dJ)
+for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
+    if not freq_band:
+        freq_band = ""
+    with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+        if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+            f.write("\n"+"--------------------")
+            f.write(f"inverting for lowpassed {freq_band}Hz signal")
+            f.write("--------------------")
+    # Callback object for output files
+    name = str(freq_band)+"Hz" if freq_band else ""
+    cb = spyro.io.Callback(model, comm, name=name)
+    cb.create_file(normalized_vp, vp_gradient, vp_guess)
+    # Gather the full velocity data on the master rank
+    xi = normalized_vp.vector().gather()
+    # Bounds for control
+    if model["material"]["type"] == "simp":
+        lb = 0
+        ub = 1
+    elif model["material"]["type"] == None:
+        lb = model["opts"]["cmin"]
+        ub = model["opts"]["cmax"]
 
-        # get first moment
-        m = adam.moving_avg(gamma_m, m, dJ)
-        # second moment
-        v = adam.moving_avg(gamma_v, v, dJ ** 2)
+    stop = [0]
+    change = 100
+    counter = 0
 
-        # correct for bias
-        m_ = adam.remove_bias(gamma_m, m, counter)
-        v_ = adam.remove_bias(gamma_v, v, counter)
 
-        # evaluate RMSProp averaged gradient
-        dJ = adam.RMSprop(m_, v_)
+    # Call the optimization routine from the master rank.
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
 
-        # exit if close enough, or if objective function stagnates
-        if J < 1e-16 or (counter > 0 and J == J0): break
+        while counter < max_iter:
 
-        if counter > 0:
-            # calcula a variação na função objetivo
-            change = (J - J0) / J0
+            # evaluate functional, gradient
+            model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'], root=0)
+            J, dJ = shots(xi, stop)
+            fobj.append(J)
+            # dJ /= la.norm(dJ)
 
-                # update beta
-        beta = spyro.optimizers.update_flip_limits( beta, counter, mul_beta,
-                change, xi, mode='counter')
-        # update rmin
-        model['opts']['rmin'] = spyro.optimizers.update_rmin(
-                model['opts']['rmin'], counter, lim_rmin, mul_rmin)
+            # get first moment
+            m = adam.moving_avg(gamma_m, m, dJ)
+            # second moment
+            v = adam.moving_avg(gamma_v, v, dJ ** 2)
 
-        # update control
-        # xi[:] = spyro.optimizers.iterate_cplex(dJ, beta, xi)
-        dxi = spyro.optimizers.iterate_cplex_linear(dJ, beta, xi)
-        xi += dxi
+            # correct for bias
+            m_ = adam.remove_bias(gamma_m, m, counter)
+            v_ = adam.remove_bias(gamma_v, v, counter)
 
-        # printa diferença entre iterações
-        print("\n"+iter_info.format( counter, J, change, beta,
-            model['opts']['rmin'])+"\n")
+            # evaluate RMSProp averaged gradient
+            dJ = adam.RMSprop(m_, v_)
 
-        # save old functional
-        J0, dJ0 = J, dJ
+            # exit if close enough, or if objective function stagnates
+            if J < 1e-16 or (counter > 0 and J == J0): break
 
-        counter += 1
+            if counter > 0:
+                # calcula a variação na função objetivo
+                change = (J - J0) / J0
 
-    stop = [1]
-    model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'],root=0)
-    shots(xi, stop)
+            # update beta
+            beta = spyro.optimizers.update_flip_limits( beta, counter, mul_beta,
+                    change, xi, mode='counter')
+            # update rmin
+            model['opts']['rmin'] = spyro.optimizers.update_rmin(
+                    model['opts']['rmin'], counter, lim_rmin, mul_rmin)
 
-    print("\n"+iter_info.format( counter, J, change, beta,
-            model['opts']['rmin'])+"\n")
+            # update control
+            xi = TOBS(
+                dJ,
+                # np.ones(dJ.shape) / mesh.num_cells(),
+                np.zeros(dJ.shape),
+                gbar,
+                xi.mean(),
+                epsilons,
+                beta,
+                xi)
 
-else:
-    while stop[0] == 0:
-        model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'], root=0)
+            # printa diferença entre iterações
+            print("\n"+iter_info.format( counter, J, change, beta,
+                model['opts']['rmin'])+"\n")
+            # print to file
+            with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+                f.write("\n"+iter_info.format( counter, J, change, beta,
+                        model['opts']['rmin'])+"\n")
+
+            # save old functional
+            J0, dJ0 = J, dJ
+
+            counter += 1
+
+        stop = [1]
+        model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'],root=0)
         shots(xi, stop)
 
-# Retrieve values
-spyro.utils.spatial_scatter(comm, xi, normalized_vp)
-# Update control xi from rank 0
-xi = COMM_WORLD.bcast(xi, root=0)
-normalized_vp.dat.data[:] = xi[:]
-vp_guess = spyro.utils.control_to_vp(model, normalized_vp)
+        # print to stdout
+        print("\n"+iter_info.format( counter, J, change, beta,
+                model['opts']['rmin'])+"\n")
+        # print to file
+        with open(os.path.join(model["output"]["outdir"], "output.log"), "a") as f: 
+            f.write("\n"+iter_info.format( counter, J, change, beta,
+                    model['opts']['rmin'])+"\n")
 
-# Specify output
-resultpic = model["data"]["pic"]
-outdir, resultfile = model["output"]["outdir"], model["data"]["resultfile"]
-# Save hdf5 and png of final result
-spyro.utils.save_velocity_model(comm, vp_guess, os.path.join(outdir, resultfile))
-spyro.io.save_image(vp_guess, fname=os.path.join(outdir, resultpic))
-# Register objective function history
-if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
-    np.save(os.path.join(outdir, model["data"]["fobj"]), np.array(fobj))
-    if vp_exact:
-        np.save(os.path.join(outdir, "quality_measure"), np.array(M))
+    else:
+        while stop[0] == 0:
+            model['opts']['rmin'] = COMM_WORLD.bcast(model['opts']['rmin'], root=0)
+            shots(xi, stop)
 
+    # Retrieve values
+    spyro.utils.spatial_scatter(comm, xi, normalized_vp)
+    # Update control xi from rank 0
+    xi = COMM_WORLD.bcast(xi, root=0)
+    normalized_vp.dat.data[:] = xi[:]
+    vp_guess = spyro.utils.control_to_vp(model, normalized_vp)
+
+    if freq_band:
+        model["data"]["pic"] = str(freq_band) + "Hz_" + resultpic
+        model["data"]["resultfile"] = str(freq_band) + "Hz_" + resultfile
+        model["data"]["fobj"] = str(freq_band) + "Hz_"  + fobjfile
+
+    # Save hdf5 and png of final result
+    spyro.utils.save_velocity_model(comm, vp_guess, os.path.join(outdir, model["data"]["resultfile"]))
+    spyro.io.save_image(vp_guess, fname=os.path.join(outdir, model["data"]["pic"]))
+    # Register objective function history
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+        np.save(os.path.join(outdir, model["data"]["fobj"]), np.array(fobj))
+        if vp_exact:
+            if freq_band:
+                quali = str(freq_band)+"Hz_"+ "quality_measure"
+            else:
+                quali = "quality_measure"
+            np.save(os.path.join(outdir, quali), np.array(M))
+
+# config file used
+model["acquisition"]["source_pos"] = model["acquisition"]["source_pos"].tolist()
+model["acquisition"]["receiver_locations"] = model["acquisition"]["receiver_locations"].tolist()
+spyro.io.save_model(
+    model, 
+    jsonfile=os.path.join(
+        model["output"]["outdir"], 
+        model["data"]["configfile"]
+    )
+)
