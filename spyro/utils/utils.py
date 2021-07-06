@@ -219,6 +219,21 @@ def normalize_vp(model, vp):
     return control
 
 
+def control_to_vp(model, control):
+
+    vp = firedrake.Function(control)
+
+    if "material" in model:
+        if model["material"]["type"] == "simp":
+            vp_min = Constant(model["material"]["vp_min"])
+            vp_max = Constant(model["material"]["vp_max"])
+            penal = Constant(model["material"]["penal"])
+
+            vp.assign(vp_min + (vp_max - vp_min) * control ** penal)
+
+    return vp
+
+
 def discretize_field(c, bins=None, n=4):
 
     c_ = firedrake.Function(c)
@@ -233,21 +248,6 @@ def discretize_field(c, bins=None, n=4):
         c_.dat.data[(bins[i] <= vp)&(vp <= bins[i+1])] = (bins[i]+bins[i+1])/2
 
     return c_, bins
-
-
-def control_to_vp(model, control):
-
-    vp = firedrake.Function(control)
-
-    if "material" in model:
-        if model["material"]["type"] == "simp":
-            vp_min = Constant(model["material"]["vp_min"])
-            vp_max = Constant(model["material"]["vp_max"])
-            penal = Constant(model["material"]["penal"])
-
-            vp.assign(vp_min + (vp_max - vp_min) * control ** penal)
-
-    return vp
 
 
 def save_velocity_model(comm, vp_model, dest_file):
