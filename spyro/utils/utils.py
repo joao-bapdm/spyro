@@ -351,7 +351,7 @@ def spatial_scatter(comm, xi, u):
     indices = np.insert(np.cumsum(N), 0, 0)
     u.dat.data[:] = xi[indices[rank] : indices[rank + 1]]
 
-def create_mesh(model, comm, quad=True):
+def create_mesh(model, comm, quad=True, diagonal='crossed'):
     """Create mesh from model parameters"""
 
     origin = tuple(model["mesh"]["origin"]) if "origin" in model["mesh"] else (0, 0) 
@@ -361,7 +361,7 @@ def create_mesh(model, comm, quad=True):
                                    model["mesh"]["Lz"],
                                    model["mesh"]["Lx"],
                                    quadrilateral=quad,
-                                   diagonal='crossed',
+                                   diagonal=diagonal,
                                    comm=comm.comm)
 
 
@@ -376,7 +376,7 @@ def create_mesh(model, comm, quad=True):
     V = FunctionSpace(mesh, element)
 
      
-    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0:
+    if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0 and "acquisition" in model:
         print(
             "INFO: Distributing %d shot(s) across %d processor(s). Each shot is using %d cores"
             % (
