@@ -22,14 +22,23 @@ class Geometry:
         self.V = V
         self.mesh = mesh
         self.my_ensemble = comm
-        self.src_depth = model["acquisition"]["src_depth"]
-        self.num_sources = model["acquisition"]["num_sources"]
-        self.src_XMIN = model["acquisition"]["src_XMIN"]
-        self.src_XMAX = model["acquisition"]["src_XMAX"]
-        self.rec_depth = model["acquisition"]["rec_depth"]
-        self.num_receivers = model["acquisition"]["num_receivers"]
-        self.rec_XMIN = model["acquisition"]["rec_XMIN"]
-        self.rec_XMAX = model["acquisition"]["rec_XMAX"]
+        acq = model["acquisition"]
+        if "src_depth" in acq:
+            self.src_depth = model["acquisition"]["src_depth"]
+        if "num_sources" in acq:
+            self.num_sources = model["acquisition"]["num_sources"]
+        if "src_XMIN" in acq:
+            self.src_XMIN = model["acquisition"]["src_XMIN"]
+        if "src_XMAX" in acq:
+            self.src_XMAX = model["acquisition"]["src_XMAX"]
+        if "rec_depth" in acq:
+            self.rec_depth = model["acquisition"]["rec_depth"]
+        if "num_receivers" in acq:
+            self.num_receivers = model["acquisition"]["num_receivers"]
+        if "rec_XMIN" in acq:
+            self.rec_XMIN = model["acquisition"]["rec_XMIN"]
+        if "rec_XMAX" in acq:
+            self.rec_XMAX = model["acquisition"]["rec_XMAX"]
         self.model = model
 
     def create_sources(self):
@@ -49,7 +58,8 @@ class Geometry:
                     (depth, self.src_XMIN), (depth, self.src_XMAX), self.num_sources
                 ).tolist()
             self.model["acquisition"]["source_pos"] = np.array(self.model["acquisition"]["source_pos"])
-        
+
+        self.model["acquisition"]["num_sources"] = len(self.model["acquisition"]["source_pos"])
         sources = spyro.Sources(self.model, self.mesh, self.V, self.my_ensemble).create()
     
         return sources
@@ -69,6 +79,7 @@ class Geometry:
             self.model["acquisition"]["receiver_locations"] = np.array(self.model["acquisition"]["receiver_locations"])
             self.model["acquisition"]["num_receivers"] = len(self.model["acquisition"]["receiver_locations"])
     
+        self.model["acquisition"]["num_receivers"] = len(self.model["acquisition"]["receiver_locations"])
         receivers = spyro.Receivers(self.model, self.mesh, self.V, self.my_ensemble).create()
     
         return receivers
@@ -78,5 +89,6 @@ class Geometry:
     
         sources = self.create_sources()
         receivers = self.create_receivers()
+        # receivers = None
     
         return sources, receivers

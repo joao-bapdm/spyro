@@ -377,15 +377,16 @@ def create_mesh(model, comm, quad=True, diagonal='crossed'):
 
      
     if comm.comm.rank == 0 and comm.ensemble_comm.rank == 0 and "acquisition" in model:
-        print(
-            "INFO: Distributing %d shot(s) across %d processor(s). Each shot is using %d cores"
-            % (
-                model["acquisition"]["num_sources"],
-                COMM_WORLD.size,
-                COMM_WORLD.size / comm.ensemble_comm.size,
-            ),
-            flush=True,
-        )
+        if "num_sources" in model["acquisition"]:
+            print(
+                "INFO: Distributing %d shot(s) across %d processor(s). Each shot is using %d cores"
+                % (
+                    model["acquisition"]["num_sources"],
+                    COMM_WORLD.size,
+                    COMM_WORLD.size / comm.ensemble_comm.size,
+                ),
+                flush=True,
+            )
     print(
         "  rank %d on ensemble %d owns %d elements and can access %d vertices"
         % (
