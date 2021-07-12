@@ -280,7 +280,7 @@ for index, freq_band in enumerate(model["inversion"]["freq_bands"]):
 
             # update beta
             beta = spyro.optimizers.update_flip_limits( beta, counter, mul_beta,
-                    change, xi, mode='counter')
+                    change, xi, mode=model["cplex"]["mode"])
             # update rmin
             model['opts']['rmin'] = spyro.optimizers.update_rmin(
                     model['opts']['rmin'], counter, lim_rmin, mul_rmin)
