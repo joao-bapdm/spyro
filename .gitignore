@@ -16,3 +16,4 @@
 *.log
 /fwd.py
 /fwi_cplex.py
+!salt.png
